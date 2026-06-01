@@ -1,0 +1,21 @@
+{namespace vh=In2code\Powermail\ViewHelpers}
+Powermail-Export wurde erstellt.
+
+Datei:
+{export.additionalProperties.domain}{export.relativePathAndFileName}
+
+Anzahl Datensaetze: {mails -> f:count()}
+
+<f:if condition="{mails}">
+<f:for each="{mails}" as="mail" iteration="iteration">
+------------------------------------------------------------
+#{iteration.cycle}
+Datum: <f:format.date format="d.m.Y H:i:s">{mail.crdate}</f:format.date>
+Formular: {mail.form.title}
+
+<f:for each="{mail.answers}" as="answer">
+- {answer.field.title}: <f:if condition="{vh:condition.isArray(val:answer.value)}"><f:then><f:for each="{answer.value}" as="singleValue" iteration="valueIteration">{singleValue}<f:if condition="{valueIteration.isLast}"><f:else>, </f:else></f:if></f:for></f:then><f:else>{answer.value}</f:else></f:if>
+</f:for>
+
+</f:for>
+</f:if>

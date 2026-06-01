@@ -1,0 +1,22 @@
+{
+  "name": "ddhefte/powermail-export",
+  "type": "typo3-cms-extension",
+  "description": "Custom Powermail export templates and configuration",
+  "license": "GPL-2.0-or-later",
+  "authors": [
+    {
+      "name": "Steffen Scheibe",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "typo3/cms-core": "^12.4",
+    "typo3/cms-fluid": "^12.4",
+    "in2code/powermail": "^12.3"
+  },
+  "extra": {
+    "typo3/cms": {
+      "extension-key": "powermail_export"
+    }
+  }
+}

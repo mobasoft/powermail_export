@@ -1,0 +1,7 @@
+plugin.tx_powermailexport {
+    settings {
+        exportTask {
+            emailTemplate = EXT:powermail_export/Resources/Private/Templates/Module/ExportTaskMail.html
+        }
+    }
+}
