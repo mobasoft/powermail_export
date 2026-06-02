@@ -13,6 +13,14 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class ExportCommand extends BaseExportCommand
 {
+    protected ExportTaskService $exportTaskService;
+
+    public function __construct(ExportTaskService $exportTaskService)
+    {
+        $this->exportTaskService = $exportTaskService;
+        parent::__construct();
+    }
+
     public function configure(): void
     {
         parent::configure();
@@ -38,7 +46,7 @@ class ExportCommand extends BaseExportCommand
     public function execute(InputInterface $input, OutputInterface $output): int
     {
         $pageUids = $this->getPageUids($input);
-        $exitCode = GeneralUtility::makeInstance(ExportTaskService::class)->run(
+        $exitCode = $this->exportTaskService->run(
             $pageUids,
             $this->getFilterVariables((int)$input->getArgument('period')),
             [
