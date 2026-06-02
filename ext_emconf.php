@@ -2,7 +2,7 @@
 
 $EM_CONF[$_EXTKEY] = [
     'title' => 'Powermail Export',
-    'description' => 'Custom templates and TypoScript for Powermail export task mails',
+    'description' => 'Custom export functionality for Powermail',
     'category' => 'plugin',
     'author' => 'Steffen Scheibe',
     'author_email' => 'mail@mobasoft.de',

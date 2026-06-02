@@ -1,0 +1,15 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  Mobasoft\PowermailExport\:
+    resource: '../Classes/*'
+
+  In2code\Powermail\Command\ExportCommand:
+    class: Mobasoft\PowermailExport\Command\ExportCommand
+    tags:
+      - name: 'console.command'
+        command: 'powermail:export'
+        description: 'This task can send a mail export with an attachment (XLS or CSV) to a receiver or a group of receivers'
