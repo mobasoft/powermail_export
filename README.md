@@ -39,6 +39,7 @@ Der Export-Command dieser Extension erweitert den Powermail-Export um:
 ### XLSX-Export
 
 Wenn der dritte Parameter `format` auf `xlsx` gesetzt wird, erzeugt der Command eine echte Excel-Arbeitsmappe statt des klassischen HTML-basierten XLS-Exports.
+Pro Task ist genau ein Format vorgesehen. Kommagetrennte Mehrfachwerte werden nicht ausgewertet.
 
 Beispiel:
 
