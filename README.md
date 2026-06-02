@@ -18,6 +18,12 @@ Beim Command `powermail:export` den letzten Parameter (`emailTemplate`) auf das 
 
 `EXT:powermail_export/Resources/Private/Templates/Module/ExportTaskMail.html`
 
+Der Export-Command dieser Extension erweitert den Powermail-Export um:
+
+- mehrere `pageUid`-Werte per `--page-uids=12,34,56`
+- rekursive Suche mit `--recursive`
+- Abbruch ohne Mailversand, wenn keine Datensaetze gefunden wurden
+
 ### Seiten-Auswahl
 
 - Alternativ zum bisherigen positionalen `pageUid`-Argument kann `--page-uids=12,34,56` genutzt werden
@@ -32,3 +38,5 @@ vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powerm
 vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" --page-uids=12,34,56 --recursive
 vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" 12,34,56
 ```
+
+Wenn du den Command in einer Scheduler-Task nutzt, kann das Felder-Setup weiterhin wie bisher ueber die vorhandenen Powermail-Argumente gepflegt werden. Nur die Seitenauswahl und der Export-Flow wurden erweitert.
