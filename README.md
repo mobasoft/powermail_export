@@ -2,7 +2,7 @@
 
 TYPO3-12-Extension fuer den Powermail-Export.
 
-Enthaelt:
+Enthält:
 - eigenes E-Mail-Template fuer `powermail:export`
 - eigenes Static TypoScript (inkl. Konstante fuer den Template-Pfad)
 - erweitert `powermail:export` um mehrere `pageUid`-Werte und rekursive Suche
@@ -47,7 +47,7 @@ Beispiel:
 vendor/bin/typo3 powermail:export export@domain.org no-reply@domain.org "Powermail Export" xlsx --page-uids=12,34,56 --recursive
 ```
 
-Die XLSX-Datei ist dabei bewusst etwas aufbereitet:
+Die XLSX-Datei ist bewusst etwas aufbereitet:
 
 - farbige, fette Kopfzeile
 - wechselnde Zeilenhintergruende
@@ -55,13 +55,13 @@ Die XLSX-Datei ist dabei bewusst etwas aufbereitet:
 - automatische Filter
 - angepasste Spaltenbreiten
 
-Zusatz: Die Datei wird nach Formularen gruppiert. Es gibt ein Uebersichtsblatt und je Formular ein eigenes Tabellenblatt.
-Im Uebersichtsblatt gibt es ausserdem einen Sprunglink zu jedem Formular-Tab.
+Zusatz: Die Datei wird nach Formularen gruppiert. Es gibt ein Übersichtsblatt und je Formular ein eigenes Tabellenblatt.
+Im Übersichtsblatt gibt es außerdem einen Sprunglink zu jedem Formular-Tab.
 
-## ToDo / Naechste Schritte
+## ToDo / Nächste Schritte
 
-- Datengewinnung weiter vereinfachen und moeglichst ohne unnötige Extbase-Objekt-Hydration vorbereiten
-- bei sehr grossen Datenmengen einen noch schlankeren Exportpfad pruefen
+- Datengewinnung weiter vereinfachen und möglichst ohne unnötige Extbase-Objekt-Hydration vorbereiten
+- bei sehr grossen Datenmengen einen noch schlankeren Exportpfad prüfen
 - optional eine echte Streaming-Variante fuer grosse XLSX-Exporte evaluieren
 
 Beispiele:
@@ -74,7 +74,7 @@ vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powerm
 vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" xlsx --page-uids=12,34,56 --recursive
 ```
 
-Wenn du den Command in einer Scheduler-Task nutzt, kann das Felder-Setup weiterhin wie bisher ueber die vorhandenen Powermail-Argumente gepflegt werden. Nur die Seitenauswahl und der Export-Flow wurden erweitert.
+Wenn du den Command in einer Scheduler-Task nutzt, kann das Feld-Setup weiterhin wie bisher über die vorhandenen Powermail-Argumente gepflegt werden. Nur die Seitenauswahl und der Export-Flow wurden erweitert.
 
 ### Service-Override
 
@@ -86,6 +86,6 @@ vendor/bin/typo3 powermail:export ...
 
 ## Links
 
-- Bugtracker: https://github.com/mobasoft/powermail_export/issues
-- Git Repository: https://github.com/mobasoft/powermail_export
+- Issues: https://github.com/mobasoft/powermail_export/issues
+- Repository: https://github.com/mobasoft/powermail_export
 - Contact: https://github.com/mobasoft
