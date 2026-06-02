@@ -32,6 +32,7 @@ Der Export-Command dieser Extension erweitert den Powermail-Export um:
 - Mehrere Seiten-IDs koennen als kommagetrennte Liste im bisherigen `pageUid`-Argument uebergeben werden, zum Beispiel `12,34,56`
 - Mit `--recursive` werden die jeweiligen Unterseiten mit durchsucht
 - Wenn keine Datensaetze gefunden werden, wird keine E-Mail mit leerem XLS-Anhang verschickt
+- Fuer Tests kann `period` auf `0` gesetzt werden; dann wird kein Zeitfilter angewendet und es werden alle passenden Mails beruecksichtigt
 
 Beispiele:
 
@@ -39,6 +40,7 @@ Beispiele:
 vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" --page-uids=12,34,56
 vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" --page-uids=12,34,56 --recursive
 vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" 12,34,56
+vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powermail Export" --page-uids=12,34,56 0
 ```
 
 Wenn du den Command in einer Scheduler-Task nutzt, kann das Felder-Setup weiterhin wie bisher ueber die vorhandenen Powermail-Argumente gepflegt werden. Nur die Seitenauswahl und der Export-Flow wurden erweitert.
