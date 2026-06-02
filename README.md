@@ -18,6 +18,8 @@ Beim Command `powermail:export` den letzten Parameter (`emailTemplate`) auf das 
 
 `EXT:powermail_export/Resources/Private/Templates/Module/ExportTaskMail.html`
 
+Wichtig: Es gibt keinen neuen Command-Namen. Diese Extension ersetzt nur die Implementierung hinter `powermail:export`.
+
 Der Export-Command dieser Extension erweitert den Powermail-Export um:
 
 - mehrere `pageUid`-Werte per `--page-uids=12,34,56`
@@ -40,3 +42,11 @@ vendor/bin/typo3 powermail:export export@domain.org  no-reply@domain.org "Powerm
 ```
 
 Wenn du den Command in einer Scheduler-Task nutzt, kann das Felder-Setup weiterhin wie bisher ueber die vorhandenen Powermail-Argumente gepflegt werden. Nur die Seitenauswahl und der Export-Flow wurden erweitert.
+
+### Service-Override
+
+In [`Configuration/Services.yaml`](/Users/sscheibe/Sites/ddgv12/packages/powermail_export/Configuration/Services.yaml) wird der originale Powermail-Service `In2code\Powermail\Command\ExportCommand` durch `Mobasoft\PowermailExport\Command\ExportCommand` ersetzt. Deshalb bleibt der aufgerufene Command unveraendert:
+
+```bash
+vendor/bin/typo3 powermail:export ...
+```
