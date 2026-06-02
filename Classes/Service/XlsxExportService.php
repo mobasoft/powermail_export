@@ -96,8 +96,6 @@ class XlsxExportService
     protected function createSpreadsheet(): Spreadsheet
     {
         $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Powermail Export');
         $spreadsheet->getProperties()
             ->setCreator('Powermail Export')
             ->setLastModifiedBy('Powermail Export')
@@ -105,36 +103,78 @@ class XlsxExportService
             ->setSubject($this->getSubject())
             ->setDescription('Powermail export data');
 
-        $firstMail = $this->getMails()->getFirst();
-        $headers = $this->getHeaders($firstMail instanceof Mail ? $firstMail : null);
-        $this->renderTitleBlock($sheet, count($headers));
-        $sheet->fromArray($headers, null, 'A3', true);
-        $this->styleHeaderRow($sheet, count($headers));
+        $groupedMails = $this->groupMailsByForm();
+        $this->createOverviewSheet($spreadsheet, $groupedMails);
 
-        $rowIndex = 4;
-        foreach ($this->getMails() as $mail) {
-            $row = $this->buildRow($mail);
-            $sheet->fromArray($row, null, 'A' . $rowIndex, true);
-            $this->styleDataRow($sheet, $rowIndex, count($row));
-            ++$rowIndex;
+        foreach ($groupedMails as $group) {
+            $sheet = $spreadsheet->createSheet();
+            $sheet->setTitle($this->buildSheetTitle($group['formTitle'], (int)$group['formUid']));
+
+            /** @var Mail|null $firstMail */
+            $firstMail = $group['mails'][0] ?? null;
+            $headers = $this->getHeaders($firstMail instanceof Mail ? $firstMail : null);
+            $this->renderTitleBlock($sheet, count($headers), $group['formTitle'], (int)$group['formUid'], count($group['mails']));
+            $sheet->fromArray($headers, null, 'A3', true);
+            $this->styleHeaderRow($sheet, count($headers));
+
+            $rowIndex = 4;
+            foreach ($group['mails'] as $mail) {
+                $row = $this->buildRow($mail);
+                $sheet->fromArray($row, null, 'A' . $rowIndex, true);
+                $this->styleDataRow($sheet, $rowIndex, count($row));
+                ++$rowIndex;
+            }
+
+            $this->formatColumns($sheet, $headers, $this->getPreviewRows($group['mails']));
+            $sheet->freezePane('A4');
+            $sheet->setAutoFilter('A3:' . Coordinate::stringFromColumnIndex($this->getColumnCount($headers)) . '3');
         }
 
-        $this->formatColumns($sheet, $headers, $this->getPreviewRows());
-        $sheet->freezePane('A4');
-        $sheet->setAutoFilter('A3:' . Coordinate::stringFromColumnIndex($this->getColumnCount()) . '3');
+        $spreadsheet->setActiveSheetIndex(0);
         return $spreadsheet;
     }
 
-    protected function renderTitleBlock(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $columnCount): void
+    protected function createOverviewSheet(Spreadsheet $spreadsheet, array $groupedMails): void
+    {
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Overview');
+
+        $headers = ['Form', 'Form UID', 'Records'];
+        $sheet->fromArray($headers, null, 'A1', true);
+        $this->styleHeaderRow($sheet, count($headers), 'A1');
+
+        $rowIndex = 2;
+        foreach ($groupedMails as $group) {
+            $sheet->setCellValue('A' . $rowIndex, (string)$group['formTitle']);
+            $sheet->setCellValue('B' . $rowIndex, (string)$group['formUid']);
+            $sheet->setCellValue('C' . $rowIndex, (int)$group['count']);
+            $this->styleDataRow($sheet, $rowIndex, count($headers));
+            ++$rowIndex;
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:C1');
+        $sheet->getColumnDimension('A')->setWidth(42);
+        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(12);
+    }
+
+    protected function renderTitleBlock(
+        \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet,
+        int $columnCount,
+        string $formTitle,
+        int $formUid,
+        int $recordCount
+    ): void
     {
         $endColumn = Coordinate::stringFromColumnIndex(max(1, $columnCount));
         $sheet->mergeCells('A1:' . $endColumn . '1');
         $sheet->mergeCells('A2:' . $endColumn . '2');
 
-        $sheet->setCellValue('A1', 'Powermail Export');
+        $sheet->setCellValue('A1', $formTitle !== '' ? $formTitle : 'Powermail Export');
         $sheet->setCellValue(
             'A2',
-            'Generated ' . date('Y-m-d H:i') . ' | Records: ' . count($this->getMails()->toArray())
+            'Form UID: ' . $formUid . ' | Generated ' . date('Y-m-d H:i') . ' | Records: ' . $recordCount
         );
 
         $sheet->getStyle('A1:' . $endColumn . '1')->applyFromArray([
@@ -173,9 +213,15 @@ class XlsxExportService
         $sheet->getRowDimension(2)->setRowHeight(18);
     }
 
-    protected function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $columnCount): void
+    protected function styleHeaderRow(
+        \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet,
+        int $columnCount,
+        string $startCell = 'A3'
+    ): void
     {
-        $range = 'A3:' . Coordinate::stringFromColumnIndex($columnCount) . '3';
+        $startColumn = preg_replace('/\d+$/', '', $startCell);
+        $startRow = (int)preg_replace('/\D+/', '', $startCell);
+        $range = $startColumn . $startRow . ':' . Coordinate::stringFromColumnIndex($columnCount) . $startRow;
         $sheet->getStyle($range)->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -209,7 +255,7 @@ class XlsxExportService
                 ],
             ],
         ]);
-        $sheet->getRowDimension(3)->setRowHeight(22);
+        $sheet->getRowDimension($startRow)->setRowHeight(22);
     }
 
     protected function styleDataRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $rowIndex, int $columnCount): void
@@ -409,10 +455,11 @@ class XlsxExportService
         return sprintf('%02d:%02d:%02d', $hours, $minutes, $rest);
     }
 
-    protected function getPreviewRows(): array
+    protected function getPreviewRows(?array $mails = null): array
     {
         $rows = [];
-        foreach ($this->getMails() as $mail) {
+        $mails = $mails ?? $this->getMails()->toArray();
+        foreach ($mails as $mail) {
             $rows[] = $this->buildRow($mail);
             if (count($rows) >= 5) {
                 break;
@@ -422,9 +469,54 @@ class XlsxExportService
         return $rows;
     }
 
-    protected function getColumnCount(): int
+    protected function getColumnCount(array $headers = []): int
     {
-        return max(1, count($this->fieldList));
+        return max(1, count($headers !== [] ? $headers : $this->fieldList));
+    }
+
+    protected function groupMailsByForm(): array
+    {
+        $groups = [];
+        foreach ($this->getMails() as $mail) {
+            $form = $mail->getForm();
+            $formUid = 0;
+            $formTitle = 'Unknown form';
+            if (is_object($form)) {
+                if (method_exists($form, 'getUid')) {
+                    $formUid = (int)$form->getUid();
+                }
+                if (method_exists($form, 'getTitle')) {
+                    $formTitle = trim((string)$form->getTitle());
+                }
+            }
+
+            $key = $formUid . ':' . $formTitle;
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'formUid' => $formUid,
+                    'formTitle' => $formTitle,
+                    'mails' => [],
+                    'count' => 0,
+                ];
+            }
+            $groups[$key]['mails'][] = $mail;
+            $groups[$key]['count']++;
+        }
+
+        return array_values($groups);
+    }
+
+    protected function buildSheetTitle(string $formTitle, int $formUid): string
+    {
+        $title = trim($formTitle);
+        if ($title === '') {
+            $title = 'Form ' . $formUid;
+        }
+        $title = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/', ' ', $title) ?: 'Form ' . $formUid;
+        $title = trim(preg_replace('/\\s+/', ' ', $title));
+        $title .= ' ' . $formUid;
+
+        return mb_substr($title, 0, 31);
     }
 
     protected function getDefaultFieldListFromFirstMail(?QueryResultInterface $mails = null): array

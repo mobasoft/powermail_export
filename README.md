@@ -55,6 +55,8 @@ Die XLSX-Datei ist dabei bewusst etwas aufbereitet:
 - automatische Filter
 - angepasste Spaltenbreiten
 
+Zusatz: Die Datei wird nach Formularen gruppiert. Es gibt ein Uebersichtsblatt und je Formular ein eigenes Tabellenblatt.
+
 Beispiele:
 
 ```bash
