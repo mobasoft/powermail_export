@@ -6,6 +6,7 @@ namespace Mobasoft\PowermailExport\Service;
 
 use In2code\Powermail\Domain\Service\ExportService;
 use Mobasoft\PowermailExport\Domain\Repository\MailRepository;
+use Mobasoft\PowermailExport\Service\Typo3DefaultExportService;
 use Mobasoft\PowermailExport\Service\XlsxExportService;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Log\LogManager;
@@ -65,7 +66,7 @@ class ExportTaskService
             );
         } else {
             $exportService = GeneralUtility::makeInstance(
-                ExportService::class,
+                Typo3DefaultExportService::class,
                 $mails,
                 $format,
                 ['domain' => $options['domain'] ?? 'https://domain.org/']
@@ -73,7 +74,7 @@ class ExportTaskService
         }
         $exportService
             ->setReceiverEmails((string)($options['receiverEmails'] ?? ''))
-            ->setSenderEmails((string)($options['senderEmail'] ?? 'sender@domain.org'))
+            ->setSenderEmails((string)($options['senderEmail'] ?? ''))
             ->setSubject((string)($options['subject'] ?? ''))
             ->setFieldList($options['fieldList'] ?? '')
             ->setAddAttachment((bool)($options['attachment'] ?? true))

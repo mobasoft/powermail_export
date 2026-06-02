@@ -618,6 +618,9 @@ class XlsxExportService
         if (is_string($senderEmails)) {
             $senderEmails = GeneralUtility::trimExplode(',', $senderEmails, true);
         }
+        if ($senderEmails === [] || $senderEmails === '') {
+            $senderEmails = $this->getDefaultSenderEmails();
+        }
         $this->senderEmails = $senderEmails;
         return $this;
     }
@@ -720,5 +723,17 @@ class XlsxExportService
             $this->emailTemplate = $emailTemplate;
         }
         return $this;
+    }
+
+    protected function getDefaultSenderEmails(): array
+    {
+        $mailConfig = $GLOBALS['TYPO3_CONF_VARS']['MAIL'] ?? [];
+        $senderAddress = (string)($mailConfig['defaultMailFromAddress'] ?? '');
+        $senderName = (string)($mailConfig['defaultMailFromName'] ?? '');
+        if ($senderAddress === '') {
+            $senderAddress = 'powermail@domain.org';
+        }
+
+        return [$senderAddress => $senderName !== '' ? $senderName : 'Sender'];
     }
 }
