@@ -145,18 +145,34 @@ class XlsxExportService
 
         $rowIndex = 2;
         foreach ($groupedMails as $group) {
+            $sheetName = $this->buildSheetTitle($group['formTitle'], (int)$group['formUid']);
             $sheet->setCellValue('A' . $rowIndex, (string)$group['formTitle']);
             $sheet->setCellValue('B' . $rowIndex, (string)$group['formUid']);
             $sheet->setCellValue('C' . $rowIndex, (int)$group['count']);
-            $this->styleDataRow($sheet, $rowIndex, count($headers));
+            $sheet->setCellValue(
+                'D' . $rowIndex,
+                '=HYPERLINK("#\'' . str_replace("'", "''", $sheetName) . '\'!A1","Open")'
+            );
+            $sheet->getStyle('D' . $rowIndex)->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['argb' => self::COLOR_BLUE],
+                    'underline' => 'single',
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+            ]);
+            $this->styleDataRow($sheet, $rowIndex, 4);
             ++$rowIndex;
         }
 
         $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:C1');
+        $sheet->setAutoFilter('A1:D1');
         $sheet->getColumnDimension('A')->setWidth(42);
         $sheet->getColumnDimension('B')->setWidth(12);
         $sheet->getColumnDimension('C')->setWidth(12);
+        $sheet->getColumnDimension('D')->setWidth(12);
     }
 
     protected function renderTitleBlock(
