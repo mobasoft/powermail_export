@@ -734,6 +734,6 @@ class XlsxExportService
             $senderAddress = 'powermail@domain.org';
         }
 
-        return [$senderAddress => $senderName !== '' ? $senderName : 'Sender'];
+        return [$senderName !== '' ? $senderName : $senderAddress => $senderAddress];
     }
 }

@@ -33,6 +33,6 @@ class Typo3DefaultExportService extends ExportService
             $senderAddress = 'powermail@domain.org';
         }
 
-        return [$senderAddress => $senderName !== '' ? $senderName : 'Sender'];
+        return [$senderName !== '' ? $senderName : $senderAddress => $senderAddress];
     }
 }
