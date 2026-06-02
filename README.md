@@ -58,6 +58,12 @@ Die XLSX-Datei ist dabei bewusst etwas aufbereitet:
 Zusatz: Die Datei wird nach Formularen gruppiert. Es gibt ein Uebersichtsblatt und je Formular ein eigenes Tabellenblatt.
 Im Uebersichtsblatt gibt es ausserdem einen Sprunglink zu jedem Formular-Tab.
 
+## ToDo / Naechste Schritte
+
+- Datengewinnung weiter vereinfachen und moeglichst ohne unnötige Extbase-Objekt-Hydration vorbereiten
+- bei sehr grossen Datenmengen einen noch schlankeren Exportpfad pruefen
+- optional eine echte Streaming-Variante fuer grosse XLSX-Exporte evaluieren
+
 Beispiele:
 
 ```bash
