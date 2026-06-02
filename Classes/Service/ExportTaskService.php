@@ -13,11 +13,6 @@ use TYPO3\CMS\Extbase\Persistence\Exception\InvalidQueryException;
 
 class ExportTaskService
 {
-    public function __construct(
-        protected readonly MailRepository $mailRepository
-    ) {
-    }
-
     /**
      * @param array<int> $pageUids
      * @param array $filterVariables
@@ -29,12 +24,14 @@ class ExportTaskService
      */
     public function run(array $pageUids, array $filterVariables, array $options): int
     {
-        $pageUids = $this->mailRepository->resolvePageUids($pageUids, (bool)($options['recursive'] ?? false));
+        /** @var MailRepository $mailRepository */
+        $mailRepository = GeneralUtility::makeInstance(MailRepository::class);
+        $pageUids = $mailRepository->resolvePageUids($pageUids, (bool)($options['recursive'] ?? false));
         if ($pageUids === []) {
-            return 1;
+            return 0;
         }
 
-        $mails = $this->mailRepository->findAllInPids($pageUids, [], $filterVariables);
+        $mails = $mailRepository->findAllInPids($pageUids, [], $filterVariables);
         if ($mails->count() === 0) {
             return 0;
         }
