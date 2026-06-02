@@ -83,3 +83,9 @@ In [`Configuration/Services.yaml`](/Users/sscheibe/Sites/ddgv12/packages/powerma
 ```bash
 vendor/bin/typo3 powermail:export ...
 ```
+
+## Links
+
+- Bugtracker: https://github.com/mobasoft/powermail_export/issues
+- Git Repository: https://github.com/mobasoft/powermail_export
+- Contact: https://github.com/mobasoft
