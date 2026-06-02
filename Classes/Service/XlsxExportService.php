@@ -5,19 +5,16 @@ declare(strict_types=1);
 namespace Mobasoft\PowermailExport\Service;
 
 use DateTimeInterface;
-use Exception;
 use In2code\Powermail\Domain\Model\Answer;
 use In2code\Powermail\Domain\Model\Field;
 use In2code\Powermail\Domain\Model\Mail;
 use In2code\Powermail\Utility\BasicFileUtility;
 use In2code\Powermail\Utility\StringUtility;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use TYPO3\CMS\Core\Mail\MailMessage;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -25,6 +22,13 @@ use TYPO3\CMS\Extbase\Persistence\QueryResultInterface;
 
 class XlsxExportService
 {
+    protected const COLOR_NAVY = 'FF16324F';
+    protected const COLOR_BLUE = 'FF2F75B5';
+    protected const COLOR_BLUE_LIGHT = 'FFEAF2FB';
+    protected const COLOR_BLUE_STRIPES = 'FFF7FAFD';
+    protected const COLOR_TEXT = 'FF1F2933';
+    protected const COLOR_MUTED = 'FF5F6B7A';
+
     protected ?QueryResultInterface $mails = null;
     protected array $receiverEmails = [];
     protected array $senderEmails = ['powermail@domain.org'];
@@ -94,8 +98,6 @@ class XlsxExportService
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Powermail Export');
-        $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:' . Coordinate::stringFromColumnIndex($this->getColumnCount()) . '1');
         $spreadsheet->getProperties()
             ->setCreator('Powermail Export')
             ->setLastModifiedBy('Powermail Export')
@@ -105,10 +107,11 @@ class XlsxExportService
 
         $firstMail = $this->getMails()->getFirst();
         $headers = $this->getHeaders($firstMail instanceof Mail ? $firstMail : null);
-        $sheet->fromArray($headers, null, 'A1', true);
+        $this->renderTitleBlock($sheet, count($headers));
+        $sheet->fromArray($headers, null, 'A3', true);
         $this->styleHeaderRow($sheet, count($headers));
 
-        $rowIndex = 2;
+        $rowIndex = 4;
         foreach ($this->getMails() as $mail) {
             $row = $this->buildRow($mail);
             $sheet->fromArray($row, null, 'A' . $rowIndex, true);
@@ -117,12 +120,62 @@ class XlsxExportService
         }
 
         $this->formatColumns($sheet, $headers, $this->getPreviewRows());
+        $sheet->freezePane('A4');
+        $sheet->setAutoFilter('A3:' . Coordinate::stringFromColumnIndex($this->getColumnCount()) . '3');
         return $spreadsheet;
+    }
+
+    protected function renderTitleBlock(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $columnCount): void
+    {
+        $endColumn = Coordinate::stringFromColumnIndex(max(1, $columnCount));
+        $sheet->mergeCells('A1:' . $endColumn . '1');
+        $sheet->mergeCells('A2:' . $endColumn . '2');
+
+        $sheet->setCellValue('A1', 'Powermail Export');
+        $sheet->setCellValue(
+            'A2',
+            'Generated ' . date('Y-m-d H:i') . ' | Records: ' . count($this->getMails()->toArray())
+        );
+
+        $sheet->getStyle('A1:' . $endColumn . '1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'size' => 16,
+                'color' => ['argb' => 'FFFFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['argb' => self::COLOR_NAVY],
+            ],
+            'alignment' => [
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'horizontal' => Alignment::HORIZONTAL_LEFT,
+            ],
+        ]);
+
+        $sheet->getStyle('A2:' . $endColumn . '2')->applyFromArray([
+            'font' => [
+                'italic' => true,
+                'size' => 10,
+                'color' => ['argb' => self::COLOR_MUTED],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['argb' => self::COLOR_BLUE_LIGHT],
+            ],
+            'alignment' => [
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'horizontal' => Alignment::HORIZONTAL_LEFT,
+            ],
+        ]);
+
+        $sheet->getRowDimension(1)->setRowHeight(24);
+        $sheet->getRowDimension(2)->setRowHeight(18);
     }
 
     protected function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $columnCount): void
     {
-        $range = 'A1:' . Coordinate::stringFromColumnIndex($columnCount) . '1';
+        $range = 'A3:' . Coordinate::stringFromColumnIndex($columnCount) . '3';
         $sheet->getStyle($range)->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -130,29 +183,60 @@ class XlsxExportService
             ],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['argb' => 'FF1F4E78'],
+                'startColor' => ['argb' => self::COLOR_BLUE],
             ],
             'alignment' => [
                 'vertical' => Alignment::VERTICAL_CENTER,
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'wrapText' => true,
             ],
             'borders' => [
+                'top' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => self::COLOR_NAVY],
+                ],
                 'bottom' => [
                     'borderStyle' => Border::BORDER_THIN,
-                    'color' => ['argb' => 'FF14324D'],
+                    'color' => ['argb' => self::COLOR_NAVY],
+                ],
+                'left' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FFB8C7D9'],
+                ],
+                'right' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FFB8C7D9'],
                 ],
             ],
         ]);
+        $sheet->getRowDimension(3)->setRowHeight(22);
     }
 
     protected function styleDataRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $rowIndex, int $columnCount): void
     {
+        $range = 'A' . $rowIndex . ':' . Coordinate::stringFromColumnIndex($columnCount) . $rowIndex;
+        $sheet->getStyle($range)->applyFromArray([
+            'font' => [
+                'color' => ['argb' => self::COLOR_TEXT],
+            ],
+            'alignment' => [
+                'vertical' => Alignment::VERTICAL_TOP,
+                'wrapText' => true,
+            ],
+            'borders' => [
+                'bottom' => [
+                    'borderStyle' => Border::BORDER_HAIR,
+                    'color' => ['argb' => 'FFD9E2EC'],
+                ],
+            ],
+        ]);
+
         if (($rowIndex % 2) === 0) {
-            $sheet->getStyle('A' . $rowIndex . ':' . Coordinate::stringFromColumnIndex($columnCount) . $rowIndex)
+            $sheet->getStyle($range)
                 ->getFill()
                 ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()
-                ->setARGB('FFF7FAFC');
+                ->setARGB(self::COLOR_BLUE_STRIPES);
         }
     }
 
@@ -160,10 +244,10 @@ class XlsxExportService
     {
         foreach (array_keys($headers) as $index => $header) {
             $column = Coordinate::stringFromColumnIndex($index + 1);
-            $width = max(strlen((string)$header) + 2, 16);
+            $width = max(strlen((string)$header) + 4, 16);
             foreach ($rows as $row) {
                 $value = (string)($row[$index] ?? '');
-                $width = max($width, min(48, strlen($value) + 2));
+                $width = max($width, min(64, strlen($value) + 2));
             }
             $sheet->getColumnDimension($column)->setWidth($width);
         }
@@ -250,13 +334,13 @@ class XlsxExportService
             'subject' => $mail->getSubject(),
             'marketing_referer_domain' => $mail->getMarketingRefererDomain(),
             'marketing_referer' => $mail->getMarketingReferer(),
-            'marketing_frontend_language' => (string)$mail->getMarketingFrontendLanguage(),
+            'marketing_frontend_language' => $this->resolveFrontendLanguageLabel((int)$mail->getMarketingFrontendLanguage()),
             'marketing_browser_language' => $mail->getMarketingBrowserLanguage(),
             'marketing_country' => $mail->getMarketingCountry(),
-            'marketing_mobile_device' => $mail->getMarketingMobileDevice() ? '1' : '0',
+            'marketing_mobile_device' => $mail->getMarketingMobileDevice() ? 'Yes' : 'No',
             'marketing_page_funnel' => $this->normalizeArrayValue($mail->getMarketingPageFunnel()),
             'user_agent' => $mail->getUserAgent(),
-            'time' => (string)$mail->getTime(),
+            'time' => $this->formatDuration($mail->getTime()),
             'sender_ip' => $mail->getSenderIp(),
             'uid' => (string)$mail->getUid(),
             'feuser' => $this->resolveFeUserValue($mail),
@@ -301,6 +385,28 @@ class XlsxExportService
         }
 
         return $dateTime->format('Y-m-d H:i:s');
+    }
+
+    protected function resolveFrontendLanguageLabel(int $languageUid): string
+    {
+        if ($languageUid <= 0) {
+            return 'Default';
+        }
+
+        return 'Language #' . $languageUid;
+    }
+
+    protected function formatDuration(int $seconds): string
+    {
+        if ($seconds <= 0) {
+            return '';
+        }
+
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $rest = $seconds % 60;
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $rest);
     }
 
     protected function getPreviewRows(): array
