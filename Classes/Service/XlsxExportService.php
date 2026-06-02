@@ -78,6 +78,7 @@ class XlsxExportService
             GeneralUtility::getFileAbsFileName($this->getEmailTemplate())
         );
         $standaloneView->assign('export', $this);
+        $standaloneView->assign('mails', $this->getMails());
         return $standaloneView->render();
     }
 
@@ -112,14 +113,15 @@ class XlsxExportService
 
             /** @var Mail|null $firstMail */
             $firstMail = $group['mails'][0] ?? null;
-            $headers = $this->getHeaders($firstMail instanceof Mail ? $firstMail : null);
+            $fieldList = $firstMail instanceof Mail ? $this->getFieldListForMail($firstMail) : [];
+            $headers = $this->getHeaders($firstMail instanceof Mail ? $firstMail : null, $fieldList);
             $this->renderTitleBlock($sheet, count($headers), $group['formTitle'], (int)$group['formUid'], count($group['mails']));
             $sheet->fromArray($headers, null, 'A3', true);
             $this->styleHeaderRow($sheet, count($headers));
 
             $rowIndex = 4;
             foreach ($group['mails'] as $mail) {
-                $row = $this->buildRow($mail);
+                $row = $this->buildRow($mail, $fieldList);
                 $sheet->fromArray($row, null, 'A' . $rowIndex, true);
                 $this->styleDataRow($sheet, $rowIndex, count($row));
                 ++$rowIndex;
@@ -315,22 +317,39 @@ class XlsxExportService
         }
     }
 
-    protected function getHeaders(?Mail $firstMail = null): array
+    protected function getHeaders(?Mail $firstMail = null, array $fieldList = []): array
     {
         $headers = [];
-        foreach ($this->fieldList as $fieldListItem) {
+        $fieldList = $fieldList !== [] ? $fieldList : $this->fieldList;
+        foreach ($fieldList as $fieldListItem) {
             $headers[] = $this->resolveHeaderLabel((string)$fieldListItem, $firstMail);
         }
         return $headers;
     }
 
-    protected function buildRow(Mail $mail): array
+    protected function buildRow(Mail $mail, array $fieldList = []): array
     {
         $row = [];
-        foreach ($this->fieldList as $fieldListItem) {
+        $fieldList = $fieldList !== [] ? $fieldList : $this->fieldList;
+        foreach ($fieldList as $fieldListItem) {
             $row[] = $this->resolveValue($mail, (string)$fieldListItem);
         }
         return $row;
+    }
+
+    protected function getFieldListForMail(Mail $mail): array
+    {
+        $fieldList = [];
+        $form = $mail->getForm();
+        if (is_object($form) && method_exists($form, 'getFields')) {
+            foreach ($form->getFields(Field::FIELD_TYPE_EXTPORTABLE) as $field) {
+                if (method_exists($field, 'getUid')) {
+                    $fieldList[] = $field->getUid();
+                }
+            }
+        }
+
+        return $fieldList !== [] ? $fieldList : $this->fieldList;
     }
 
     protected function resolveHeaderLabel(string $fieldListItem, ?Mail $firstMail = null): string
