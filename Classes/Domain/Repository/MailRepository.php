@@ -6,6 +6,7 @@ namespace Mobasoft\PowermailExport\Domain\Repository;
 
 use In2code\Powermail\Database\QueryGenerator;
 use In2code\Powermail\Domain\Repository\MailRepository as BaseMailRepository;
+use In2code\Powermail\Domain\Model\Mail as PowermailMail;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Persistence\Exception\InvalidQueryException;
 use TYPO3\CMS\Extbase\Persistence\QueryInterface;
@@ -13,6 +14,13 @@ use TYPO3\CMS\Extbase\Persistence\QueryResultInterface;
 
 class MailRepository extends BaseMailRepository
 {
+    public function __construct()
+    {
+        $this->objectType = PowermailMail::class;
+        parent::__construct();
+        $this->objectType = PowermailMail::class;
+    }
+
     /**
      * Find all mails in multiple PIDs.
      *

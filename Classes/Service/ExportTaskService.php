@@ -6,6 +6,8 @@ namespace Mobasoft\PowermailExport\Service;
 
 use In2code\Powermail\Domain\Service\ExportService;
 use Mobasoft\PowermailExport\Domain\Repository\MailRepository;
+use Psr\Log\LoggerInterface;
+use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Configuration\Exception\InvalidConfigurationTypeException;
 use TYPO3\CMS\Extbase\Mvc\Exception\InvalidExtensionNameException;
@@ -13,6 +15,13 @@ use TYPO3\CMS\Extbase\Persistence\Exception\InvalidQueryException;
 
 class ExportTaskService
 {
+    protected LoggerInterface $logger;
+
+    public function __construct()
+    {
+        $this->logger = GeneralUtility::makeInstance(LogManager::class)->getLogger(__CLASS__);
+    }
+
     /**
      * @param array<int> $pageUids
      * @param array $filterVariables
@@ -26,13 +35,22 @@ class ExportTaskService
     {
         /** @var MailRepository $mailRepository */
         $mailRepository = GeneralUtility::makeInstance(MailRepository::class);
+        $this->logger->info('Powermail export started', [
+            'pageUids' => $pageUids,
+            'recursive' => (bool)($options['recursive'] ?? false),
+            'period' => $filterVariables['filter']['start'] ?? null,
+        ]);
         $pageUids = $mailRepository->resolvePageUids($pageUids, (bool)($options['recursive'] ?? false));
         if ($pageUids === []) {
+            $this->logger->warning('Powermail export skipped because no page uids were resolved');
             return 0;
         }
+        $this->logger->info('Powermail export resolved page uids', ['resolvedPageUids' => $pageUids]);
 
         $mails = $mailRepository->findAllInPids($pageUids, [], $filterVariables);
+        $this->logger->info('Powermail export query finished', ['mailCount' => $mails->count()]);
         if ($mails->count() === 0) {
+            $this->logger->warning('Powermail export skipped because no mails were found');
             return 0;
         }
 
@@ -52,6 +70,8 @@ class ExportTaskService
             ->setFileName((string)($options['fileName'] ?? ''))
             ->setEmailTemplate((string)($options['emailTemplate'] ?? 'EXT:powermail/Resources/Private/Templates/Module/ExportTaskMail.html'));
 
-        return $exportService->send() ? 0 : 1;
+        $sent = $exportService->send();
+        $this->logger->info('Powermail export mail send result', ['sent' => $sent]);
+        return $sent ? 0 : 1;
     }
 }
