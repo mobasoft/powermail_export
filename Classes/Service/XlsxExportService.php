@@ -61,7 +61,7 @@ class XlsxExportService
     {
         $email = GeneralUtility::makeInstance(MailMessage::class);
         $email->setTo($this->getReceiverEmails());
-        $email->setFrom($this->getSenderEmails());
+        $email->setFrom($this->getDefaultSenderAddress());
         $email->setSubject($this->getSubject());
         $email->html($this->createMailBody());
         if ($this->isAddAttachment()) {
@@ -725,7 +725,7 @@ class XlsxExportService
         return $this;
     }
 
-    protected function getDefaultSenderEmails(): array
+    protected function getDefaultSenderAddress(): string
     {
         $mailConfig = $GLOBALS['TYPO3_CONF_VARS']['MAIL'] ?? [];
         $senderAddress = (string)($mailConfig['defaultMailFromAddress'] ?? '');
@@ -734,6 +734,10 @@ class XlsxExportService
             $senderAddress = 'powermail@domain.org';
         }
 
-        return [$senderName !== '' ? $senderName : $senderAddress => $senderAddress];
+        if ($senderName !== '') {
+            return sprintf('%s <%s>', $senderName, $senderAddress);
+        }
+
+        return $senderAddress;
     }
 }

@@ -14,7 +14,7 @@ class Typo3DefaultExportService extends ExportService
     {
         $email = GeneralUtility::makeInstance(MailMessage::class);
         $email->setTo($this->getReceiverEmails());
-        $email->setFrom($this->getDefaultSenderEmails());
+        $email->setFrom($this->getDefaultSenderAddress());
         $email->setSubject($this->getSubject());
         $email->html($this->createMailBody());
         if ($this->isAddAttachment()) {
@@ -24,7 +24,7 @@ class Typo3DefaultExportService extends ExportService
         return $email->isSent();
     }
 
-    protected function getDefaultSenderEmails(): array
+    protected function getDefaultSenderAddress(): string
     {
         $mailConfig = $GLOBALS['TYPO3_CONF_VARS']['MAIL'] ?? [];
         $senderAddress = (string)($mailConfig['defaultMailFromAddress'] ?? '');
@@ -33,6 +33,10 @@ class Typo3DefaultExportService extends ExportService
             $senderAddress = 'powermail@domain.org';
         }
 
-        return [$senderName !== '' ? $senderName : $senderAddress => $senderAddress];
+        if ($senderName !== '') {
+            return sprintf('%s <%s>', $senderName, $senderAddress);
+        }
+
+        return $senderAddress;
     }
 }
