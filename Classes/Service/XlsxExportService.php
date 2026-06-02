@@ -1,0 +1,491 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mobasoft\PowermailExport\Service;
+
+use DateTimeInterface;
+use Exception;
+use In2code\Powermail\Domain\Model\Answer;
+use In2code\Powermail\Domain\Model\Field;
+use In2code\Powermail\Domain\Model\Mail;
+use In2code\Powermail\Utility\BasicFileUtility;
+use In2code\Powermail\Utility\StringUtility;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use TYPO3\CMS\Core\Mail\MailMessage;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Persistence\QueryResultInterface;
+
+class XlsxExportService
+{
+    protected ?QueryResultInterface $mails = null;
+    protected array $receiverEmails = [];
+    protected array $senderEmails = ['powermail@domain.org'];
+    protected string $subject = '';
+    protected array $fieldList = [];
+    protected string $fileName = '';
+    protected array $additionalProperties = [];
+    protected bool $addAttachment = true;
+    protected string $storageFolder = 'typo3temp/assets/tx_powermail/';
+    protected string $emailTemplate = 'Module/ExportTaskMail.html';
+
+    public function __construct(?QueryResultInterface $mails = null, array $additionalProperties = [])
+    {
+        $this->setMails($mails);
+        $this->setAdditionalProperties($additionalProperties);
+        $this->setFieldList($this->getDefaultFieldListFromFirstMail($mails));
+        $this->createRandomFileName();
+    }
+
+    public function send(): bool
+    {
+        if (!$this->createExportFile()) {
+            return false;
+        }
+
+        return $this->sendEmail();
+    }
+
+    protected function sendEmail(): bool
+    {
+        $email = GeneralUtility::makeInstance(MailMessage::class);
+        $email->setTo($this->getReceiverEmails());
+        $email->setFrom($this->getSenderEmails());
+        $email->setSubject($this->getSubject());
+        $email->html($this->createMailBody());
+        if ($this->isAddAttachment()) {
+            $email->attachFromPath($this->getAbsolutePathAndFileName());
+        }
+        $email->send();
+        return $email->isSent();
+    }
+
+    protected function createMailBody(): string
+    {
+        $standaloneView = \In2code\Powermail\Utility\TemplateUtility::getDefaultStandAloneView();
+        $standaloneView->setTemplatePathAndFilename(
+            GeneralUtility::getFileAbsFileName($this->getEmailTemplate())
+        );
+        $standaloneView->assign('export', $this);
+        return $standaloneView->render();
+    }
+
+    protected function createExportFile(): bool
+    {
+        BasicFileUtility::createFolderIfNotExists($this->getStorageFolder(true));
+        $spreadsheet = $this->createSpreadsheet();
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($this->getAbsolutePathAndFileName());
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return true;
+    }
+
+    protected function createSpreadsheet(): Spreadsheet
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Powermail Export');
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:' . Coordinate::stringFromColumnIndex($this->getColumnCount()) . '1');
+        $spreadsheet->getProperties()
+            ->setCreator('Powermail Export')
+            ->setLastModifiedBy('Powermail Export')
+            ->setTitle('Powermail Export')
+            ->setSubject($this->getSubject())
+            ->setDescription('Powermail export data');
+
+        $firstMail = $this->getMails()->getFirst();
+        $headers = $this->getHeaders($firstMail instanceof Mail ? $firstMail : null);
+        $sheet->fromArray($headers, null, 'A1', true);
+        $this->styleHeaderRow($sheet, count($headers));
+
+        $rowIndex = 2;
+        foreach ($this->getMails() as $mail) {
+            $row = $this->buildRow($mail);
+            $sheet->fromArray($row, null, 'A' . $rowIndex, true);
+            $this->styleDataRow($sheet, $rowIndex, count($row));
+            ++$rowIndex;
+        }
+
+        $this->formatColumns($sheet, $headers, $this->getPreviewRows());
+        return $spreadsheet;
+    }
+
+    protected function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $columnCount): void
+    {
+        $range = 'A1:' . Coordinate::stringFromColumnIndex($columnCount) . '1';
+        $sheet->getStyle($range)->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['argb' => 'FFFFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['argb' => 'FF1F4E78'],
+            ],
+            'alignment' => [
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+            'borders' => [
+                'bottom' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF14324D'],
+                ],
+            ],
+        ]);
+    }
+
+    protected function styleDataRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $rowIndex, int $columnCount): void
+    {
+        if (($rowIndex % 2) === 0) {
+            $sheet->getStyle('A' . $rowIndex . ':' . Coordinate::stringFromColumnIndex($columnCount) . $rowIndex)
+                ->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()
+                ->setARGB('FFF7FAFC');
+        }
+    }
+
+    protected function formatColumns(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, array $headers, array $rows): void
+    {
+        foreach (array_keys($headers) as $index => $header) {
+            $column = Coordinate::stringFromColumnIndex($index + 1);
+            $width = max(strlen((string)$header) + 2, 16);
+            foreach ($rows as $row) {
+                $value = (string)($row[$index] ?? '');
+                $width = max($width, min(48, strlen($value) + 2));
+            }
+            $sheet->getColumnDimension($column)->setWidth($width);
+        }
+    }
+
+    protected function getHeaders(?Mail $firstMail = null): array
+    {
+        $headers = [];
+        foreach ($this->fieldList as $fieldListItem) {
+            $headers[] = $this->resolveHeaderLabel((string)$fieldListItem, $firstMail);
+        }
+        return $headers;
+    }
+
+    protected function buildRow(Mail $mail): array
+    {
+        $row = [];
+        foreach ($this->fieldList as $fieldListItem) {
+            $row[] = $this->resolveValue($mail, (string)$fieldListItem);
+        }
+        return $row;
+    }
+
+    protected function resolveHeaderLabel(string $fieldListItem, ?Mail $firstMail = null): string
+    {
+        $labels = [
+            'crdate' => 'Created',
+            'sender_name' => 'Sender name',
+            'sender_mail' => 'Sender email',
+            'receiver_mail' => 'Receiver email',
+            'subject' => 'Subject',
+            'marketing_referer_domain' => 'Referer domain',
+            'marketing_referer' => 'Referer',
+            'marketing_frontend_language' => 'Frontend language',
+            'marketing_browser_language' => 'Browser language',
+            'marketing_country' => 'Country',
+            'marketing_mobile_device' => 'Mobile device',
+            'marketing_page_funnel' => 'Page funnel',
+            'user_agent' => 'User agent',
+            'time' => 'Submit time',
+            'sender_ip' => 'Sender IP',
+            'uid' => 'Record UID',
+            'feuser' => 'Frontend user',
+        ];
+
+        if (isset($labels[$fieldListItem])) {
+            return $labels[$fieldListItem];
+        }
+
+        if (ctype_digit($fieldListItem)) {
+            if ($firstMail !== null) {
+                $answers = $firstMail->getAnswersByFieldUid();
+                $answer = $answers[(int)$fieldListItem] ?? null;
+                if ($answer instanceof Answer && $answer->getField() !== null) {
+                    $title = trim($answer->getField()->getTitle());
+                    if ($title !== '') {
+                        return $title;
+                    }
+                }
+            }
+            return 'Field #' . $fieldListItem;
+        }
+
+        return $fieldListItem;
+    }
+
+    protected function resolveValue(Mail $mail, string $fieldListItem): string
+    {
+        $answer = null;
+        if (ctype_digit($fieldListItem)) {
+            $answers = $mail->getAnswersByFieldUid();
+            $answer = $answers[(int)$fieldListItem] ?? null;
+            if ($answer instanceof Answer) {
+                return $this->normalizeAnswerValue($answer);
+            }
+            return '';
+        }
+
+        return match ($fieldListItem) {
+            'crdate' => $this->formatDateTime($mail->getCrdate()),
+            'sender_name' => $mail->getSenderName(),
+            'sender_mail' => $mail->getSenderMail(),
+            'receiver_mail' => $mail->getReceiverMail(),
+            'subject' => $mail->getSubject(),
+            'marketing_referer_domain' => $mail->getMarketingRefererDomain(),
+            'marketing_referer' => $mail->getMarketingReferer(),
+            'marketing_frontend_language' => (string)$mail->getMarketingFrontendLanguage(),
+            'marketing_browser_language' => $mail->getMarketingBrowserLanguage(),
+            'marketing_country' => $mail->getMarketingCountry(),
+            'marketing_mobile_device' => $mail->getMarketingMobileDevice() ? '1' : '0',
+            'marketing_page_funnel' => $this->normalizeArrayValue($mail->getMarketingPageFunnel()),
+            'user_agent' => $mail->getUserAgent(),
+            'time' => (string)$mail->getTime(),
+            'sender_ip' => $mail->getSenderIp(),
+            'uid' => (string)$mail->getUid(),
+            'feuser' => $this->resolveFeUserValue($mail),
+            default => '',
+        };
+    }
+
+    protected function normalizeAnswerValue(Answer $answer): string
+    {
+        $value = $answer->getValue();
+        if (is_array($value)) {
+            return $this->normalizeArrayValue($value);
+        }
+
+        return (string)$value;
+    }
+
+    protected function normalizeArrayValue(array $value): string
+    {
+        $flattened = [];
+        array_walk_recursive($value, static function ($item) use (&$flattened): void {
+            $flattened[] = (string)$item;
+        });
+
+        return implode(', ', array_filter($flattened, static fn(string $item): bool => $item !== ''));
+    }
+
+    protected function resolveFeUserValue(Mail $mail): string
+    {
+        $feuser = $mail->getFeuser();
+        if (is_object($feuser) && method_exists($feuser, 'getUid')) {
+            return (string)$feuser->getUid();
+        }
+
+        return '';
+    }
+
+    protected function formatDateTime(?DateTimeInterface $dateTime): string
+    {
+        if ($dateTime === null) {
+            return '';
+        }
+
+        return $dateTime->format('Y-m-d H:i:s');
+    }
+
+    protected function getPreviewRows(): array
+    {
+        $rows = [];
+        foreach ($this->getMails() as $mail) {
+            $rows[] = $this->buildRow($mail);
+            if (count($rows) >= 5) {
+                break;
+            }
+        }
+
+        return $rows;
+    }
+
+    protected function getColumnCount(): int
+    {
+        return max(1, count($this->fieldList));
+    }
+
+    protected function getDefaultFieldListFromFirstMail(?QueryResultInterface $mails = null): array
+    {
+        $fieldList = [];
+        if ($mails !== null) {
+            /** @var Mail $mail */
+            $mail = $mails->getFirst();
+            if ($mail !== null && $mail->getForm() !== null) {
+                foreach ($mail->getForm()->getFields(Field::FIELD_TYPE_EXTPORTABLE) as $field) {
+                    $fieldList[] = $field->getUid();
+                }
+            }
+        }
+
+        return $fieldList;
+    }
+
+    protected function createRandomFileName(): void
+    {
+        $this->fileName = StringUtility::getRandomString(55) . '.xlsx';
+    }
+
+    public function getMails(): QueryResultInterface
+    {
+        return $this->mails;
+    }
+
+    public function setMails(?QueryResultInterface $mails): self
+    {
+        $this->mails = $mails;
+        return $this;
+    }
+
+    public function getReceiverEmails(): array
+    {
+        $mailArray = [];
+        foreach ($this->receiverEmails as $email) {
+            $mailArray[$email] = '';
+        }
+        return $mailArray;
+    }
+
+    public function setReceiverEmails($emails): self
+    {
+        if (is_string($emails)) {
+            $emails = GeneralUtility::trimExplode(',', $emails, true);
+        }
+        $this->receiverEmails = $emails;
+        return $this;
+    }
+
+    public function getSenderEmails(): array
+    {
+        $mailArray = [];
+        foreach ($this->senderEmails as $email) {
+            $mailArray[$email] = 'Sender';
+        }
+        return $mailArray;
+    }
+
+    public function setSenderEmails($senderEmails): self
+    {
+        if (is_string($senderEmails)) {
+            $senderEmails = GeneralUtility::trimExplode(',', $senderEmails, true);
+        }
+        $this->senderEmails = $senderEmails;
+        return $this;
+    }
+
+    public function getSubject(): string
+    {
+        return $this->subject;
+    }
+
+    public function setSubject(string $subject): self
+    {
+        $this->subject = $subject;
+        return $this;
+    }
+
+    public function getFieldList(): array
+    {
+        return $this->fieldList;
+    }
+
+    public function setFieldList($fieldList): self
+    {
+        if (!empty($fieldList)) {
+            if (is_string($fieldList)) {
+                $fieldList = GeneralUtility::trimExplode(',', $fieldList, true);
+            }
+            $this->fieldList = $fieldList;
+        }
+        return $this;
+    }
+
+    public function getFileName(): string
+    {
+        return $this->fileName;
+    }
+
+    public function setFileName(?string $fileName = null): self
+    {
+        if ($fileName) {
+            $this->fileName = $fileName . '.xlsx';
+        }
+        return $this;
+    }
+
+    public function getRelativePathAndFileName(): string
+    {
+        return $this->getStorageFolder() . $this->getFileName();
+    }
+
+    public function getAbsolutePathAndFileName(): string
+    {
+        return GeneralUtility::getFileAbsFileName($this->getRelativePathAndFileName());
+    }
+
+    public function getAdditionalProperties(): array
+    {
+        return $this->additionalProperties;
+    }
+
+    public function setAdditionalProperties(array $additionalProperties): self
+    {
+        $this->additionalProperties = $additionalProperties;
+        return $this;
+    }
+
+    public function isAddAttachment(): bool
+    {
+        return $this->addAttachment;
+    }
+
+    public function setAddAttachment(bool $addAttachment): self
+    {
+        $this->addAttachment = $addAttachment;
+        return $this;
+    }
+
+    public function getStorageFolder(bool $absolute = false): string
+    {
+        $storageFolder = $this->storageFolder;
+        if ($absolute) {
+            $storageFolder = GeneralUtility::getFileAbsFileName($storageFolder);
+        }
+        return $storageFolder;
+    }
+
+    public function setStorageFolder(string $storageFolder): self
+    {
+        $this->storageFolder = $storageFolder;
+        return $this;
+    }
+
+    public function getEmailTemplate(): string
+    {
+        return $this->emailTemplate;
+    }
+
+    public function setEmailTemplate(string $emailTemplate): self
+    {
+        if (!empty($emailTemplate)) {
+            $this->emailTemplate = $emailTemplate;
+        }
+        return $this;
+    }
+}

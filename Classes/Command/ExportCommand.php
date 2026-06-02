@@ -18,7 +18,8 @@ class ExportCommand extends BaseExportCommand
         parent::configure();
         $this->setHelp(
             'Use --page-uids=12,34,56 to export multiple storage pages at once. '
-            . 'Add --recursive to include subpages.'
+            . 'Add --recursive to include subpages. '
+            . 'Use format=xlsx for a styled Excel workbook.'
         );
         $this->addOption(
             'page-uids',

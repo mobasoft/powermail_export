@@ -6,6 +6,7 @@ namespace Mobasoft\PowermailExport\Service;
 
 use In2code\Powermail\Domain\Service\ExportService;
 use Mobasoft\PowermailExport\Domain\Repository\MailRepository;
+use Mobasoft\PowermailExport\Service\XlsxExportService;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -54,12 +55,22 @@ class ExportTaskService
             return 0;
         }
 
-        $exportService = GeneralUtility::makeInstance(
-            ExportService::class,
-            $mails,
-            (string)($options['format'] ?? 'xls'),
-            ['domain' => $options['domain'] ?? 'https://domain.org/']
-        );
+        $format = (string)($options['format'] ?? 'xls');
+        $this->logger->info('Powermail export selected format', ['format' => $format]);
+        if ($format === 'xlsx') {
+            $exportService = GeneralUtility::makeInstance(
+                XlsxExportService::class,
+                $mails,
+                ['domain' => $options['domain'] ?? 'https://domain.org/']
+            );
+        } else {
+            $exportService = GeneralUtility::makeInstance(
+                ExportService::class,
+                $mails,
+                $format,
+                ['domain' => $options['domain'] ?? 'https://domain.org/']
+            );
+        }
         $exportService
             ->setReceiverEmails((string)($options['receiverEmails'] ?? ''))
             ->setSenderEmails((string)($options['senderEmail'] ?? 'sender@domain.org'))
